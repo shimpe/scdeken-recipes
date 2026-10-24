@@ -15,5 +15,4 @@ submodules = false
 tag_prefix = ""
 
 [versions.approved]
-"0.1.0" = "208cac8b5a71b7bc8d26ad4a419a426f38b85c36"
-# NOTE: no tags upstream; version name 0.1.0 chosen for commit 208cac8
+"0.1.0" = "934a18cc2e48088584de5bed1b18140e2d33baf8"
