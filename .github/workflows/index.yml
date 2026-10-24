@@ -1,0 +1,160 @@
+name: Index
+
+# Builds the package index, signs it, publishes it on GitHub Pages and lets the
+# tag bot propose new upstream versions. The signing key only exists in the
+# "release" environment, which is restricted to the main branch.
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['advisories/**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: index
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  index:
+    name: build and sign the index
+    runs-on: ubuntu-22.04
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Install scdeken
+        run: |
+          go install "github.com/sc-deken/sc-deken/cmd/scdeken@$(cat .scdeken-version)"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Build the index
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASES_REPO: ${{ github.repository }}
+          PAGES_BASE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+        run: |
+          mkdir site
+          scdeken index build \
+            --recipes recipes \
+            --advisories advisories \
+            --sc-versions sc-versions.toml \
+            --previous "$PAGES_BASE/index.json" \
+            --releases-repo "$RELEASES_REPO" \
+            --out site/index.json
+      - name: Sign the index
+        env:
+          SCDEKEN_SIGNING_KEY: ${{ secrets.SCDEKEN_SIGNING_KEY }}
+          SCDEKEN_SIGNING_PASSWORD: ${{ secrets.SCDEKEN_SIGNING_PASSWORD }}
+        run: scdeken index sign --in site/index.json
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    name: publish on GitHub Pages
+    needs: index
+    runs-on: ubuntu-22.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  tag-bot:
+    name: propose new upstream versions
+    needs: deploy
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # BOT_TOKEN is optional. Pull requests opened with the default token
+          # do not start the PR build workflow; a token from a bot account or
+          # a fine-grained PAT does.
+          token: ${{ secrets.BOT_TOKEN || github.token }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Install scdeken
+        run: |
+          go install "github.com/sc-deken/sc-deken/cmd/scdeken@$(cat .scdeken-version)"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Look for new upstream versions
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: scdeken index new-versions --recipes recipes > new-versions.json
+      - name: Open one pull request per new version
+        env:
+          GH_TOKEN: ${{ secrets.BOT_TOKEN || github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --quiet origin main
+          jq -c '.proposals[]' new-versions.json | while read -r row; do
+            package="$(jq -r .package <<< "$row")"
+            version="$(jq -r .version <<< "$row")"
+            commit="$(jq -r .commit <<< "$row")"
+            compare="$(jq -r '.compare_url // ""' <<< "$row")"
+            branch="bot/$package-$version"
+            if ! git check-ref-format "refs/heads/$branch"; then
+              echo "::warning::skipping $package $version: unusable branch name"
+              continue
+            fi
+            if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
+              echo "$branch already exists"
+              continue
+            fi
+            git switch --quiet --force-create "$branch" origin/main
+            scdeken recipe approve "recipes/$package.toml" "$version" "$commit"
+            git commit --quiet -am "approve $package $version"
+            git push --quiet origin "$branch"
+            {
+              echo "Upstream has a new version of **$package**: \`$version\` (commit \`$commit\`)."
+              echo
+              if [ -n "$compare" ]; then echo "Review the changes: $compare"; echo; fi
+              echo "Merging this approves the version; CI then builds and publishes it."
+            } > body.md
+            gh pr create --base main --head "$branch" \
+              --title "Approve $package $version" --body-file body.md
+          done
+      - name: Open an issue for each moved tag
+        env:
+          GH_TOKEN: ${{ secrets.BOT_TOKEN || github.token }}
+        run: |
+          jq -c '.moved[]' new-versions.json | while read -r row; do
+            package="$(jq -r .package <<< "$row")"
+            version="$(jq -r .version <<< "$row")"
+            recorded="$(jq -r .recorded <<< "$row")"
+            now="$(jq -r .now <<< "$row")"
+            title="Moved tag: $package $version"
+            if gh issue list --state open --limit 200 --json title --jq '.[].title' | grep -Fxq "$title"; then
+              echo "an issue for \"$title\" is already open"
+              continue
+            fi
+            {
+              echo "The upstream tag for **$package $version** now points at a different commit."
+              echo
+              echo "- approved commit: \`$recorded\`"
+              echo "- tag now points at: \`$now\`"
+              echo
+              echo "A moved tag can mean a rewritten release. Please look before approving anything else."
+            } > body.md
+            gh issue create --title "$title" --body-file body.md
+          done

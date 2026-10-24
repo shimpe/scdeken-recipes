@@ -1,0 +1,89 @@
+name: Add a package
+
+# Turns an "Add a package" issue into a draft recipe and a pull request.
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+
+jobs:
+  recipe:
+    name: draft a recipe
+    if: contains(github.event.issue.labels.*.name, 'add-package')
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # BOT_TOKEN is optional; with it, the new pull request starts the PR build.
+          token: ${{ secrets.BOT_TOKEN || github.token }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Install scdeken
+        run: |
+          go install "github.com/sc-deken/sc-deken/cmd/scdeken@$(cat .scdeken-version)"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Draft the recipe and open a pull request
+        env:
+          GH_TOKEN: ${{ secrets.BOT_TOKEN || github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          fail() {
+            {
+              echo "Sorry, I could not turn this request into a recipe."
+              echo
+              echo '````'
+              printf '%s\n' "$1" | tr -d '\r`' | sed 's/@/(at)/g' | head -n 30
+              echo '````'
+            } > comment.md
+            gh issue comment "$ISSUE_NUMBER" --body-file comment.md
+            exit 1
+          }
+
+          url="$(printf '%s\n' "$ISSUE_BODY" | tr -d '\r' |
+            awk '/^### GitHub URL of the plugin or quark/ {f=1; next} /^### / {f=0} f && NF {print; exit}')"
+          if ! [[ "$url" =~ ^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/?$ ]]; then
+            fail "The address must look like https://github.com/owner/name. Please edit the issue and try again."
+          fi
+
+          draft="$RUNNER_TEMP/draft.toml"
+          if ! message="$(scdeken recipe new "$url" --out "$draft" 2>&1)"; then
+            fail "$message"
+          fi
+          name="$(sed -n 's/^name = "\(.*\)"$/\1/p' "$draft" | head -n 1)"
+          if ! [[ "$name" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+            fail "The draft recipe has an unusable name."
+          fi
+          if [ -e "recipes/$name.toml" ]; then
+            fail "A recipe called $name already exists."
+          fi
+
+          branch="add/$name"
+          if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
+            fail "A pull request branch for $name already exists."
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --quiet -c "$branch"
+          cp "$draft" "recipes/$name.toml"
+          git add "recipes/$name.toml"
+          git commit --quiet -m "add $name"
+          git push --quiet origin "$branch"
+
+          printf 'Adds a draft recipe for %s.\n\nCloses #%s\n' "$url" "$ISSUE_NUMBER" > body.md
+          if ! pr="$(gh pr create --base main --head "$branch" --title "add $name" --body-file body.md 2>&1)"; then
+            fail "$pr"
+          fi
+          gh issue comment "$ISSUE_NUMBER" --body "Thanks! I drafted a recipe: $pr. The build results for each platform will appear there."

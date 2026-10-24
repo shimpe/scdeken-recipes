@@ -1,0 +1,188 @@
+name: PR build
+
+# Builds every newly approved recipe version on every platform and reports the
+# result. Runs on pull_request (never pull_request_target) and holds no secrets.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  plan:
+    name: check recipes and plan builds
+    runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      has_builds: ${{ steps.matrix.outputs.has_builds }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Install scdeken
+        run: |
+          go install "github.com/sc-deken/sc-deken/cmd/scdeken@$(cat .scdeken-version)"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Check changed recipes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git diff --name-only --diff-filter=AM "$BASE_SHA" HEAD -- 'recipes/*.toml' > changed.txt
+          while IFS= read -r recipe; do
+            echo "::group::recipe check $recipe"
+            scdeken recipe check "$recipe"
+            echo "::endgroup::"
+          done < changed.txt
+      - name: Validate advisories
+        run: scdeken advisories validate --dir advisories
+      - name: Plan builds
+        id: matrix
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          scdeken ci matrix --recipes recipes --base "$BASE_SHA" > rows.json
+          scdeken ci platforms > platforms.json
+          # Quark-only recipes have no [build] table and nothing to compile.
+          for recipe in $(jq -r '.[].recipe' rows.json | sort -u); do
+            if grep -q '^\[build' "$recipe"; then echo "$recipe"; fi
+          done | jq -R . | jq -s . > buildable.json
+          jq -c --slurpfile platforms platforms.json --slurpfile buildable buildable.json '
+            {include: [ .[] | select(.recipe as $r | $buildable[0] | any(. == $r)) as $row
+              | $platforms[0][]
+              | {recipe: $row.recipe, package: $row.package, version: $row.version,
+                 runner, key_os, arch, build_arch,
+                 key: (.key_os + "-" + .arch + "-api3")} ]}' rows.json > matrix.json
+          echo "matrix=$(cat matrix.json)" >> "$GITHUB_OUTPUT"
+          echo "has_builds=$(jq '.include | length > 0' matrix.json)" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: build ${{ matrix.package }} ${{ matrix.version }} (${{ matrix.key }})
+    needs: plan
+    if: needs.plan.outputs.has_builds == 'true'
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Install scdeken
+        run: |
+          go install "github.com/sc-deken/sc-deken/cmd/scdeken@$(cat .scdeken-version)"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Does the recipe need libraries?
+        id: requires
+        env:
+          RECIPE: ${{ matrix.recipe }}
+        run: |
+          if grep -q '^\[requires' "$RECIPE"; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Set up vcpkg
+        if: steps.requires.outputs.needed == 'true'
+        run: |
+          git clone --depth 1 https://github.com/microsoft/vcpkg "$RUNNER_TEMP/vcpkg"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cmd //c "$(cygpath -w "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.bat")" -disableMetrics
+          else
+            "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          fi
+      - name: Build
+        id: build
+        continue-on-error: true
+        env:
+          RECIPE: ${{ matrix.recipe }}
+          VERSION: ${{ matrix.version }}
+          KEY: ${{ matrix.key }}
+          BUILD_ARCH: ${{ matrix.build_arch }}
+          NEEDS_VCPKG: ${{ steps.requires.outputs.needed }}
+        run: |
+          set -o pipefail
+          out="$RUNNER_TEMP/out/$KEY"
+          mkdir -p "$RUNNER_TEMP/out" "$RUNNER_TEMP/stage"
+          args=(--recipe "$RECIPE" --version "$VERSION" --out "$out")
+          if [ -n "$BUILD_ARCH" ]; then args+=(--arch "$BUILD_ARCH"); fi
+          if [ "$NEEDS_VCPKG" = "true" ]; then args+=(--vcpkg-root "$RUNNER_TEMP/vcpkg"); fi
+          scdeken build "${args[@]}" 2>&1 | tee "$RUNNER_TEMP/build.log"
+          scdeken ci pack "$out" "$RUNNER_TEMP/stage/$KEY.zip"
+          cp "$out.files.txt" "$RUNNER_TEMP/stage/$KEY.files.txt"
+      - name: Write the summary for the pull request
+        if: always()
+        env:
+          PACKAGE: ${{ matrix.package }}
+          VERSION: ${{ matrix.version }}
+          KEY: ${{ matrix.key }}
+          OUTCOME: ${{ steps.build.outcome }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/result"
+          mark="❌"; if [ "$OUTCOME" = "success" ]; then mark="✅"; fi
+          {
+            echo "<!-- scdeken-build:$PACKAGE-$VERSION-$KEY -->"
+            echo "$mark **$PACKAGE $VERSION** on \`$KEY\`"
+            echo
+            echo "<details><summary>Last log lines</summary>"
+            echo
+            echo '````'
+            tail -n 20 "$RUNNER_TEMP/build.log" 2>/dev/null | tr -d '\r`' | sed 's/@/(at)/g' || true
+            echo '````'
+            echo "</details>"
+          } > "$RUNNER_TEMP/result/$PACKAGE-$VERSION-$KEY.md"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: result-${{ matrix.package }}-${{ matrix.version }}-${{ matrix.key }}
+          path: ${{ runner.temp }}/result
+      - uses: actions/upload-artifact@v4
+        if: steps.build.outcome == 'success'
+        with:
+          name: build-${{ matrix.package }}-${{ matrix.version }}-${{ matrix.key }}
+          path: ${{ runner.temp }}/stage
+      - name: Fail if the build failed
+        if: steps.build.outcome != 'success'
+        run: exit 1
+
+  comment:
+    name: comment on the pull request
+    needs: [plan, build]
+    if: always() && needs.plan.outputs.has_builds == 'true'
+    runs-on: ubuntu-22.04
+    # Pull requests from forks get a read-only token; the results are still in
+    # the build jobs, so a failed comment must not fail the check.
+    continue-on-error: true
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: result-*
+          merge-multiple: true
+          path: results
+      - name: Post one comment per platform
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          for file in results/*.md; do
+            marker="$(head -n 1 "$file")"
+            id="$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
+              --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n 1)"
+            if [ -n "$id" ]; then
+              gh api -X PATCH "repos/$REPO/issues/comments/$id" -F "body=@$file" > /dev/null
+            else
+              gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file "$file"
+            fi
+          done

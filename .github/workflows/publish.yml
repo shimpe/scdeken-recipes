@@ -1,0 +1,156 @@
+name: Publish
+
+# When approved recipe versions reach main: build them everywhere, then create
+# one release per package version holding the zips, the file lists and
+# SHA256SUMS, and ask index.yml to republish the index.
+
+on:
+  push:
+    branches: [main]
+    paths: ['recipes/**']
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  plan:
+    name: plan builds
+    runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      has_builds: ${{ steps.matrix.outputs.has_builds }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Install scdeken
+        run: |
+          go install "github.com/sc-deken/sc-deken/cmd/scdeken@$(cat .scdeken-version)"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Plan builds
+        id: matrix
+        env:
+          BASE_SHA: ${{ github.event.before }}
+        run: |
+          scdeken ci matrix --recipes recipes --base "$BASE_SHA" > rows.json
+          scdeken ci platforms > platforms.json
+          # Quark-only recipes have no [build] table and nothing to compile.
+          for recipe in $(jq -r '.[].recipe' rows.json | sort -u); do
+            if grep -q '^\[build' "$recipe"; then echo "$recipe"; fi
+          done | jq -R . | jq -s . > buildable.json
+          jq -c --slurpfile platforms platforms.json --slurpfile buildable buildable.json '
+            {include: [ .[] | select(.recipe as $r | $buildable[0] | any(. == $r)) as $row
+              | $platforms[0][]
+              | {recipe: $row.recipe, package: $row.package, version: $row.version,
+                 runner, key_os, arch, build_arch,
+                 key: (.key_os + "-" + .arch + "-api3")} ]}' rows.json > matrix.json
+          echo "matrix=$(cat matrix.json)" >> "$GITHUB_OUTPUT"
+          echo "has_builds=$(jq '.include | length > 0' matrix.json)" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: build ${{ matrix.package }} ${{ matrix.version }} (${{ matrix.key }})
+    needs: plan
+    if: needs.plan.outputs.has_builds == 'true'
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Install scdeken
+        run: |
+          go install "github.com/sc-deken/sc-deken/cmd/scdeken@$(cat .scdeken-version)"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Does the recipe need libraries?
+        id: requires
+        env:
+          RECIPE: ${{ matrix.recipe }}
+        run: |
+          if grep -q '^\[requires' "$RECIPE"; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Set up vcpkg
+        if: steps.requires.outputs.needed == 'true'
+        run: |
+          git clone --depth 1 https://github.com/microsoft/vcpkg "$RUNNER_TEMP/vcpkg"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cmd //c "$(cygpath -w "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.bat")" -disableMetrics
+          else
+            "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          fi
+      - name: Build and pack
+        env:
+          RECIPE: ${{ matrix.recipe }}
+          VERSION: ${{ matrix.version }}
+          KEY: ${{ matrix.key }}
+          BUILD_ARCH: ${{ matrix.build_arch }}
+          NEEDS_VCPKG: ${{ steps.requires.outputs.needed }}
+        run: |
+          out="$RUNNER_TEMP/out/$KEY"
+          mkdir -p "$RUNNER_TEMP/out" "$RUNNER_TEMP/stage"
+          args=(--recipe "$RECIPE" --version "$VERSION" --out "$out")
+          if [ -n "$BUILD_ARCH" ]; then args+=(--arch "$BUILD_ARCH"); fi
+          if [ "$NEEDS_VCPKG" = "true" ]; then args+=(--vcpkg-root "$RUNNER_TEMP/vcpkg"); fi
+          scdeken build "${args[@]}"
+          scdeken ci pack "$out" "$RUNNER_TEMP/stage/$KEY.zip"
+          cp "$out.files.txt" "$RUNNER_TEMP/stage/$KEY.files.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.package }}-${{ matrix.version }}-${{ matrix.key }}
+          path: ${{ runner.temp }}/stage
+
+  release:
+    name: create releases and refresh the index
+    if: ${{ !cancelled() && needs.plan.result == 'success' && contains(fromJSON('["success","skipped"]'), needs.build.result) }}
+    needs: [plan, build]
+    runs-on: ubuntu-22.04
+    environment: release
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: build-*
+          path: artifacts
+      - name: Create or update one release per package version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TARGET: ${{ github.sha }}
+          MATRIX: ${{ needs.plan.outputs.matrix }}
+        run: |
+          printf '%s' "$MATRIX" | jq -r '.include[] | "\(.package) \(.version) \(.key)"' |
+          while read -r package version key; do
+            tag="$package-$version"
+            mkdir -p "release/$tag"
+            cp artifacts/"build-$tag-$key"/* "release/$tag/"
+          done
+          for dir in release/*/; do
+            [ -d "$dir" ] || continue
+            tag="$(basename "$dir")"
+            (cd "$dir" && sha256sum -- *.zip > SHA256SUMS)
+            if gh release view "$tag" > /dev/null 2>&1; then
+              gh release upload "$tag" "$dir"* --clobber
+            else
+              gh release create "$tag" "$dir"* --target "$TARGET" \
+                --title "$tag" --notes "Prebuilt binaries of $tag, built by CI."
+            fi
+          done
+      - name: Refresh the index
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run index.yml

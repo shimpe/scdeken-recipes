@@ -1,0 +1,8 @@
+# SuperCollider releases the index knows about. "api" is the plugin API
+# generation (the "api3" in platform keys such as windows-x86_64-api3);
+# "min" is the oldest SuperCollider that can load plugins built for it.
+
+[[sc]]
+version = "3.14.1"
+api = 3
+min = "3.13.0"
