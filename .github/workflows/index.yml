@@ -1,8 +1,9 @@
 name: Index
 
 # Builds the package index, signs it, publishes it on GitHub Pages and lets the
-
-# "release" environment, which is restricted to the main branch.
+# tag bot propose new upstream versions. Only the sign job can use the signing
+# key: it lives in the "release" environment, which is restricted to the main
+# branch.
 
 on:
   schedule:
@@ -127,7 +128,7 @@ jobs:
       - name: Look for new upstream versions
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: scdeken index new-versions --recipes recipes > new-versions.json
+        run: scdeken index new-versions --recipes recipes > "$RUNNER_TEMP/new-versions.json"
       - name: Open one pull request per new version
         env:
           GH_TOKEN: ${{ secrets.BOT_TOKEN || github.token }}
@@ -165,20 +166,34 @@ jobs:
               echo
               if [ -n "$compare" ]; then echo "Review the changes: $compare"; echo; fi
               echo "Merging this approves the version; CI then builds and publishes it."
-            } > body.md
+            } > "$RUNNER_TEMP/body.md"
             if ! gh pr create --base main --head "$branch" \
-              --title "Approve $package $version" --body-file body.md; then
+              --title "Approve $package $version" --body-file "$RUNNER_TEMP/body.md"; then
               git push --quiet origin --delete "$branch"
               return 1
             fi
           }
 
+          # Every proposal starts from a clean main, so a failed one leaves
+          # nothing behind for the next.
+          clean_main() {
+            git switch --quiet --discard-changes --detach origin/main
+            git clean --quiet -fd
+          }
+
+          failed=0
           while IFS= read -r row; do
+            clean_main
             if ! propose "$row"; then
-              echo "::warning::could not open a pull request for one proposal"
+              echo "::warning::could not open a pull request for $(jq -r '"\(.package) \(.version)"' <<< "$row")"
+              failed=1
             fi
-            git switch --quiet --detach origin/main
-          done < <(jq -c '.proposals[]' new-versions.json)
+          done < <(jq -c '.proposals[]' "$RUNNER_TEMP/new-versions.json")
+          clean_main
+          if [ "$failed" = 1 ]; then
+            echo "::error::some proposals could not be opened (see the warnings); the next run tries them again"
+            exit 1
+          fi
       - name: Open an issue for each moved tag
         if: ${{ !cancelled() }}
         env:
@@ -201,7 +216,7 @@ jobs:
               echo "- tag now points at: \`$now\`"
               echo
               echo "A moved tag can mean a rewritten release. Please look before approving anything else."
-            } > body.md
-            gh issue create --title "$title" --body-file body.md ||
+            } > "$RUNNER_TEMP/body.md"
+            gh issue create --title "$title" --body-file "$RUNNER_TEMP/body.md" ||
               echo "::warning::could not open the issue for $title"
-          done < <(jq -c '.moved[]' new-versions.json)
+          done < <(jq -c '.moved[]' "$RUNNER_TEMP/new-versions.json")
