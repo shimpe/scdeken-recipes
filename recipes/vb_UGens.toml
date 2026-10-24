@@ -1,0 +1,22 @@
+name = "vb_UGens"
+summary = "A modest collection of UGens by Volker Boehm: filters, reverb, phase vocoder, utilities and more"
+repo = "https://github.com/v7b1/vb_UGens"
+license = "GPL-2.0-or-later"
+authors = ["v7b1"]
+kind = "plugin"
+
+[build]
+system = "cmake"
+subdir = ""
+sc_path_var = "SC_PATH"
+cmake_flags = ["-DSUPERNOVA=ON"]
+submodules = true
+
+[versions]
+tag_prefix = "v"
+
+[versions.approved]
+"0.0.6" = "01366c44aba814800efba6e3b29a24b9e477bb3d"
+# NOTE: hand-written: the draft tool does not detect SC_PATH because the root CMakeLists
+# NOTE: only add_subdirectory()s the projects. Core UGens are GPL-2.0-or-later; bundled
+# NOTE: NPleth is CC BY-NC-SA 3.0 and Audrey (DaisySP) is MIT.

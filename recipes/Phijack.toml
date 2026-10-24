@@ -1,0 +1,12 @@
+name = "Phijack"
+summary = "A value pattern that hijacks another value pattern output when a predicate is true"
+repo = "https://github.com/shimpe/phijack"
+license = "GPL-3.0"
+authors = ["shimpe"]
+kind = "quark"
+
+[versions]
+tag_prefix = ""
+
+[versions.approved]
+"0.0.1" = "2f4f06d96d849afeebbc2fa52c41c0a836134ac2"

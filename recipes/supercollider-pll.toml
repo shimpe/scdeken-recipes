@@ -1,0 +1,20 @@
+name = "supercollider-pll"
+summary = "A phase-locked loop UGen for SuperCollider"
+repo = "https://github.com/nhthn/supercollider-pll"
+license = "GPL-3.0"
+authors = ["nhthn"]
+kind = "plugin"
+
+[build]
+system = "cmake"
+subdir = ""
+sc_path_var = "SC_PATH"
+cmake_flags = ["-DSUPERNOVA=ON"]
+submodules = true
+
+[versions]
+tag_prefix = ""
+
+[versions.approved]
+"0.1.0" = "1f9a140d915c102de3cbae1e1ed3f4764c0ff3bd"
+# NOTE: no tags upstream; version name 0.1.0 chosen for commit 1f9a140

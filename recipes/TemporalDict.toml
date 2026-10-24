@@ -1,0 +1,13 @@
+name = "TemporalDict"
+summary = "Quark to track key-value pairs over time"
+repo = "https://github.com/shimpe/temporaldict"
+license = "GPL-3.0"
+authors = ["shimpe"]
+kind = "quark"
+
+[versions]
+tag_prefix = ""
+
+[versions.approved]
+"0.1.0" = "48c29f77672416bfb3c8d81dc0d8d108b19e3b9b"
+# NOTE: no tags upstream; version name 0.1.0 chosen for commit 48c29f7

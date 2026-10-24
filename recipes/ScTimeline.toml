@@ -1,0 +1,13 @@
+name = "ScTimeline"
+summary = "simple timeline for supercollider patterns"
+repo = "https://github.com/shimpe/sc-timeline"
+license = "GPL-3.0"
+authors = ["shimpe"]
+kind = "quark"
+
+[versions]
+tag_prefix = ""
+
+[versions.approved]
+"0.1.0" = "ca27d83083932fdb286fa8c3f67a76f91a74bfe5"
+# NOTE: no tags upstream; version name 0.1.0 chosen for commit ca27d83

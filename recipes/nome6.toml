@@ -1,0 +1,19 @@
+name = "nome6"
+summary = "6 operator fm-like synth based on jacobian elliptic functions"
+repo = "https://github.com/shimpe/nome6"
+license = "GPL-3.0"
+authors = ["shimpe"]
+kind = "plugin"
+
+[build]
+system = "cmake"
+subdir = ""
+sc_path_var = "SC_PATH"
+submodules = false
+
+[versions]
+tag_prefix = ""
+
+[versions.approved]
+"0.1.0" = "fc3a5051d4702f9000a629ad5fb0d5d2e52105e7"
+# NOTE: no tags upstream; version name 0.1.0 chosen for commit fc3a505

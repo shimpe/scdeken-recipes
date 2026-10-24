@@ -1,0 +1,19 @@
+name = "XPlayBuf"
+summary = "A buffer player for SuperCollider that loops, fades and doesn't glitch on the float-precision issue"
+repo = "https://github.com/elgiano/XPlayBuf"
+license = "GPL-3.0"
+authors = ["elgiano"]
+kind = "plugin"
+
+[build]
+system = "cmake"
+subdir = ""
+sc_path_var = "SC_PATH"
+cmake_flags = ["-DSUPERNOVA=ON"]
+submodules = false
+
+[versions]
+tag_prefix = ""
+
+[versions.approved]
+"0.1.3" = "44b90771c4508913ad76cb7347b6b10183395351"

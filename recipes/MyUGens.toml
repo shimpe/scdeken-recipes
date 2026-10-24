@@ -1,0 +1,20 @@
+name = "MyUGens"
+summary = "Physical-modelling UGens for trombone, clarinet, flute, plucked strings and more"
+repo = "https://github.com/sonoro1234/MyUGens"
+license = "GPL-2.0-or-later"
+authors = ["sonoro1234"]
+kind = "plugin"
+
+[build]
+system = "cmake"
+subdir = ""
+sc_path_var = "SC_PATH"
+cmake_flags = ["-DSUPERNOVA=ON"]
+submodules = true
+
+[versions]
+tag_prefix = ""
+
+[versions.approved]
+"0.1.0" = "f62135a1314076a30e1bafd2229ba9b85264b373"
+# NOTE: no tags upstream; version name 0.1.0 chosen for commit f62135a

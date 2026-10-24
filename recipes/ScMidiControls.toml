@@ -1,0 +1,13 @@
+name = "ScMidiControls"
+summary = "Quark to create self-learning bi-directional MIDI controls"
+repo = "https://github.com/shimpe/sc-midi-controls"
+license = "GPL-3.0"
+authors = ["shimpe"]
+kind = "quark"
+
+[versions]
+tag_prefix = ""
+
+[versions.approved]
+"0.1.0" = "80b0a2bfc488f6c7ca76105c8d459a8e28c5ff69"
+# NOTE: no tags upstream; version name 0.1.0 chosen for commit 80b0a2b

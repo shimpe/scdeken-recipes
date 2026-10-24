@@ -1,0 +1,19 @@
+name = "fmx6"
+summary = "extended version of supercollider fm7 with six operators"
+repo = "https://github.com/shimpe/fmx6"
+license = "GPL-3.0"
+authors = ["shimpe"]
+kind = "plugin"
+
+[build]
+system = "cmake"
+subdir = ""
+sc_path_var = "SC_PATH"
+submodules = false
+
+[versions]
+tag_prefix = ""
+
+[versions.approved]
+"0.1.0" = "208cac8b5a71b7bc8d26ad4a419a426f38b85c36"
+# NOTE: no tags upstream; version name 0.1.0 chosen for commit 208cac8

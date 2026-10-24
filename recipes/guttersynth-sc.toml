@@ -1,0 +1,19 @@
+name = "guttersynth-sc"
+summary = "Chaotic physical modelling in SuperCollider"
+repo = "https://github.com/madskjeldgaard/guttersynth-sc"
+license = "GPL-3.0"
+authors = ["madskjeldgaard"]
+kind = "plugin"
+
+[build]
+system = "cmake"
+subdir = ""
+sc_path_var = "SC_PATH"
+cmake_flags = ["-DSUPERNOVA=ON"]
+submodules = false
+
+[versions]
+tag_prefix = ""
+
+[versions.approved]
+"0.1.0" = "fb481d47336cdf45c1c19ca8392d982657a8c136"

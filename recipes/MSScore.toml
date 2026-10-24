@@ -1,0 +1,12 @@
+name = "MSScore"
+summary = "Write, play and visualize scores in MusicScene from Panola strings"
+repo = "https://github.com/shimpe/msscore"
+license = "GPL-3.0"
+authors = ["shimpe"]
+kind = "quark"
+
+[versions]
+tag_prefix = ""
+
+[versions.approved]
+"0.7.0" = "547444a19420fbc61467b737a02206d36d91c8b5"

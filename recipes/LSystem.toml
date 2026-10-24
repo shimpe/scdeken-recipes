@@ -1,0 +1,13 @@
+name = "LSystem"
+summary = "Quark to generate and interpret Lindenmayer Systems"
+repo = "https://github.com/shimpe/sc-lsystem"
+license = "GPL-3.0"
+authors = ["shimpe"]
+kind = "quark"
+
+[versions]
+tag_prefix = ""
+
+[versions.approved]
+"0.1.0" = "2c7e78bfe44a9283c74579a478fca1a23a6e17e9"
+# NOTE: no tags upstream; version name 0.1.0 chosen for commit 2c7e78b

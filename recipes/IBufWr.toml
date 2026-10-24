@@ -1,0 +1,20 @@
+name = "IBufWr"
+summary = "An Interpolating Buffer Writer UGen for SuperCollider"
+repo = "https://github.com/tremblap/IBufWr"
+license = "BSD-3-Clause"
+authors = ["tremblap"]
+kind = "plugin"
+
+[build]
+system = "cmake"
+subdir = ""
+sc_path_var = "SC_PATH"
+cmake_flags = ["-DSUPERNOVA=ON"]
+submodules = false
+
+[versions]
+tag_prefix = ""
+
+[versions.approved]
+"0.1.0" = "baa8d625464eed7eef306b6fd3b0498344c6b8b9"
+# NOTE: no tags upstream; version name 0.1.0 chosen for commit baa8d62

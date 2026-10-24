@@ -1,0 +1,12 @@
+name = "Mitola"
+summary = "Microtonal counterpart to Panola - write microtonal music using a text-based score"
+repo = "https://github.com/shimpe/mitola"
+license = "GPL-3.0"
+authors = ["shimpe"]
+kind = "quark"
+
+[versions]
+tag_prefix = ""
+
+[versions.approved]
+"0.0.8" = "dbffd07401e5b94467d0cc0dc65aa1a21170fef5"

@@ -1,0 +1,20 @@
+name = "steroids-ugens"
+summary = "SuperCollider standard UGens on steroids"
+repo = "https://github.com/tai-studio/steroids-ugens"
+license = "GPL-3.0"
+authors = ["tai-studio"]
+kind = "plugin"
+
+[build]
+system = "cmake"
+subdir = ""
+sc_path_var = "SC_PATH"
+cmake_flags = ["-DSUPERNOVA=ON"]
+submodules = false
+
+[versions]
+tag_prefix = ""
+
+[versions.approved]
+"0.1.0" = "1d4a9b2a0aa439bf9aac9d4257f3d7867cad36c1"
+# NOTE: no tags upstream; version name 0.1.0 chosen for commit 1d4a9b2

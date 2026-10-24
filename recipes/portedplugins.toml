@@ -1,0 +1,19 @@
+name = "portedplugins"
+summary = "A collection of plugins for the SuperCollider sound environment, all of which are ported / remixed from elsewhere"
+repo = "https://github.com/madskjeldgaard/portedplugins"
+license = "GPL-3.0"
+authors = ["madskjeldgaard"]
+kind = "plugin"
+
+[build]
+system = "cmake"
+subdir = ""
+sc_path_var = "SC_PATH"
+cmake_flags = ["-DSUPERNOVA=ON"]
+submodules = true
+
+[versions]
+tag_prefix = ""
+
+[versions.approved]
+"0.4.2" = "26fa985d6987d642baefe461b25606396362cdd5"

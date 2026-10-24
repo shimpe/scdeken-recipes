@@ -1,0 +1,12 @@
+name = "Scparco"
+summary = "Quark to simplify parsing text"
+repo = "https://github.com/shimpe/scparco"
+license = "GPL-3.0"
+authors = ["shimpe"]
+kind = "quark"
+
+[versions]
+tag_prefix = ""
+
+[versions.approved]
+"0.0.6" = "a88db64e7f870a2ebd22218c089f76490010d8f9"

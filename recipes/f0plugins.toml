@@ -1,0 +1,19 @@
+name = "f0plugins"
+summary = "Sound-chip emulations, euclidean rhythm and other UGens by redFrik"
+repo = "https://github.com/redFrik/f0plugins"
+license = "GPL-2.0-or-later"
+authors = ["redFrik"]
+kind = "plugin"
+
+[build]
+system = "cmake"
+subdir = ""
+sc_path_var = "SC_PATH"
+cmake_flags = ["-DSUPERNOVA=ON"]
+submodules = false
+
+[versions]
+tag_prefix = ""
+
+[versions.approved]
+"4.2.3" = "7030aaf9c6450010d4536c2c1c1ecbdc0416c520"

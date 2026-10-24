@@ -1,0 +1,20 @@
+name = "squinewave"
+summary = "Bandlimited square-sine-saw-pulse morphing oscillator with hardsync"
+repo = "https://github.com/required-field/squinewave"
+license = "NOASSERTION"
+authors = ["required-field"]
+kind = "plugin"
+
+[build]
+system = "cmake"
+subdir = "supercollider"
+sc_path_var = "SC_PATH"
+cmake_flags = ["-DSUPERNOVA=ON"]
+submodules = false
+
+[versions]
+tag_prefix = ""
+
+[versions.approved]
+"1.0.0-RC4" = "582e011c4f5bbeb148f6dc22d1086e666527c5eb"
+# NOTE: upstream README says it has no license, so the license is recorded as NOASSERTION

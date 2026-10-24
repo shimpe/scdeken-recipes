@@ -1,0 +1,20 @@
+name = "simplexsynth"
+summary = "Simplex noise UGen for SuperCollider"
+repo = "https://github.com/esluyter/simplexsynth"
+license = "GPL-3.0"
+authors = ["esluyter"]
+kind = "plugin"
+
+[build]
+system = "cmake"
+subdir = ""
+sc_path_var = "SC_PATH"
+cmake_flags = ["-DSUPERNOVA=ON"]
+submodules = true
+
+[versions]
+tag_prefix = ""
+
+[versions.approved]
+"0.1.0" = "6fb3235b3bfd7b26edbbf18459f438a3a102a19e"
+# NOTE: no tags upstream; version name 0.1.0 chosen for commit 6fb3235
