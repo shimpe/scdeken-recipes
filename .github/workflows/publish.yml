@@ -30,6 +30,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
+          cache: false
       - name: Install scdeken
         run: |
           go install "github.com/sc-deken/sc-deken/cmd/scdeken@$(cat .scdeken-version)"
@@ -39,6 +40,11 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.before }}
         run: |
+          if [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            # First push: every approved version is new. Compare with an empty commit.
+            tree="$(git hash-object -t tree -w /dev/null)"
+            BASE_SHA="$(GIT_AUTHOR_NAME=x GIT_AUTHOR_EMAIL=x@example.org GIT_COMMITTER_NAME=x GIT_COMMITTER_EMAIL=x@example.org git commit-tree "$tree" -m empty)"
+          fi
           scdeken ci matrix --recipes recipes --base "$BASE_SHA" > rows.json
           scdeken ci platforms > platforms.json
           # Quark-only recipes have no [build] table and nothing to compile.
@@ -67,6 +73,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
+          cache: false
       - name: Install scdeken
         run: |
           go install "github.com/sc-deken/sc-deken/cmd/scdeken@$(cat .scdeken-version)"

@@ -1,7 +1,7 @@
 name: Index
 
 # Builds the package index, signs it, publishes it on GitHub Pages and lets the
-# tag bot propose new upstream versions. The signing key only exists in the
+
 # "release" environment, which is restricted to the main branch.
 
 on:
@@ -24,15 +24,17 @@ defaults:
     shell: bash
 
 jobs:
-  index:
-    name: build and sign the index
+  build:
+    name: build the index
     runs-on: ubuntu-22.04
-    environment: release
+    # This job reads untrusted upstream repositories, so it has no access to
+    # the release environment and no signing secrets.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: stable
+          cache: false
       - name: Install scdeken
         run: |
           go install "github.com/sc-deken/sc-deken/cmd/scdeken@$(cat .scdeken-version)"
@@ -51,6 +53,31 @@ jobs:
             --previous "$PAGES_BASE/index.json" \
             --releases-repo "$RELEASES_REPO" \
             --out site/index.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-index
+          path: site/index.json
+
+  sign:
+    name: sign the index
+    needs: build
+    runs-on: ubuntu-22.04
+    environment: release
+    steps:
+      # Only the repository's own scdeken version is built here; no upstream code runs.
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: false
+      - name: Install scdeken
+        run: |
+          go install "github.com/sc-deken/sc-deken/cmd/scdeken@$(cat .scdeken-version)"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - uses: actions/download-artifact@v4
+        with:
+          name: unsigned-index
+          path: site
       - name: Sign the index
         env:
           SCDEKEN_SIGNING_KEY: ${{ secrets.SCDEKEN_SIGNING_KEY }}
@@ -62,7 +89,7 @@ jobs:
 
   deploy:
     name: publish on GitHub Pages
-    needs: index
+    needs: sign
     runs-on: ubuntu-22.04
     permissions:
       pages: write
@@ -92,6 +119,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
+          cache: false
       - name: Install scdeken
         run: |
           go install "github.com/sc-deken/sc-deken/cmd/scdeken@$(cat .scdeken-version)"
@@ -107,38 +135,56 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch --quiet origin main
-          jq -c '.proposals[]' new-versions.json | while read -r row; do
-            package="$(jq -r .package <<< "$row")"
-            version="$(jq -r .version <<< "$row")"
-            commit="$(jq -r .commit <<< "$row")"
-            compare="$(jq -r '.compare_url // ""' <<< "$row")"
+
+          # Opens the pull request for one proposal (a JSON object). A failure
+          # leaves no branch behind, so the next run tries again.
+          propose() {
+            local package version commit compare branch
+            package="$(jq -r .package <<< "$1")"
+            version="$(jq -r .version <<< "$1")"
+            commit="$(jq -r .commit <<< "$1")"
+            compare="$(jq -r '.compare_url // ""' <<< "$1")"
             branch="bot/$package-$version"
-            if ! git check-ref-format "refs/heads/$branch"; then
-              echo "::warning::skipping $package $version: unusable branch name"
-              continue
+            git check-ref-format "refs/heads/$branch" || { echo "unusable branch name"; return 1; }
+
+            if [ "$(gh pr list --state all --head "$branch" --json number --jq length)" != "0" ]; then
+              echo "$branch already has a pull request"
+              return 0
             fi
+            # A branch without a pull request is left over from a failed run.
             if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
-              echo "$branch already exists"
-              continue
+              git push --quiet origin --delete "$branch" || return 1
             fi
-            git switch --quiet --force-create "$branch" origin/main
-            scdeken recipe approve "recipes/$package.toml" "$version" "$commit"
-            git commit --quiet -am "approve $package $version"
-            git push --quiet origin "$branch"
+
+            git switch --quiet --force-create "$branch" origin/main || return 1
+            scdeken recipe approve "recipes/$package.toml" "$version" "$commit" || return 1
+            git commit --quiet -am "approve $package $version" || return 1
+            git push --quiet origin "$branch" || return 1
             {
               echo "Upstream has a new version of **$package**: \`$version\` (commit \`$commit\`)."
               echo
               if [ -n "$compare" ]; then echo "Review the changes: $compare"; echo; fi
               echo "Merging this approves the version; CI then builds and publishes it."
             } > body.md
-            gh pr create --base main --head "$branch" \
-              --title "Approve $package $version" --body-file body.md
-          done
+            if ! gh pr create --base main --head "$branch" \
+              --title "Approve $package $version" --body-file body.md; then
+              git push --quiet origin --delete "$branch"
+              return 1
+            fi
+          }
+
+          while IFS= read -r row; do
+            if ! propose "$row"; then
+              echo "::warning::could not open a pull request for one proposal"
+            fi
+            git switch --quiet --detach origin/main
+          done < <(jq -c '.proposals[]' new-versions.json)
       - name: Open an issue for each moved tag
+        if: ${{ !cancelled() }}
         env:
           GH_TOKEN: ${{ secrets.BOT_TOKEN || github.token }}
         run: |
-          jq -c '.moved[]' new-versions.json | while read -r row; do
+          while IFS= read -r row; do
             package="$(jq -r .package <<< "$row")"
             version="$(jq -r .version <<< "$row")"
             recorded="$(jq -r .recorded <<< "$row")"
@@ -156,5 +202,6 @@ jobs:
               echo
               echo "A moved tag can mean a rewritten release. Please look before approving anything else."
             } > body.md
-            gh issue create --title "$title" --body-file body.md
-          done
+            gh issue create --title "$title" --body-file body.md ||
+              echo "::warning::could not open the issue for $title"
+          done < <(jq -c '.moved[]' new-versions.json)

@@ -53,18 +53,33 @@ the code owner and published by the Index workflow as soon as they reach `main`.
    commit the key.
 2. **Secrets.** Create a GitHub *environment* named `release`, restrict it to the
    `main` branch, and add two secrets to it: `SCDEKEN_SIGNING_KEY` (the text of
-   `scdeken.key`) and `SCDEKEN_SIGNING_PASSWORD`. Only the Index job and the
+   `scdeken.key`) and `SCDEKEN_SIGNING_PASSWORD`. Only the Index workflow's sign job and the
    release step of Publish use this environment; pull request builds never see it.
 3. **Public key.** Paste the contents of `scdeken.pub` into `EmbeddedPublicKey`
    in `internal/sign/key.go` of the sc-deken repository and ship a new release.
 4. **Pages.** In Settings > Pages choose *GitHub Actions* as the source.
 5. **Actions settings.** Allow GitHub Actions to create pull requests
    (Settings > Actions > General).
-6. **Optional `BOT_TOKEN`.** Pull requests created with the default token do not
-   start the PR build workflow. Add a repository secret `BOT_TOKEN` (a
-   fine-grained token with contents, pull requests and issues write access) and
-   the bot uses it instead.
-7. **Tool version.** `.scdeken-version` holds the sc-deken tag or branch the
+6. **Branch protection (required).** "Merging a pull request means the version is
+   approved" is only true if `main` is protected. Create a ruleset for `main` that:
+   - requires a pull request before merging;
+   - requires review from Code Owners (`.github/CODEOWNERS`);
+   - requires the **PR build** status checks (`check recipes and plan builds`
+     and the `build ...` jobs) to pass;
+   - has **no bypass** for GitHub Actions, the bot account or admins you do not
+     want to trust blindly;
+   - blocks force pushes and branch deletion.
+   Without this, anyone who can push can approve a version, and the publish and
+   index workflows will build and sign it.
+7. **Optional `BOT_TOKEN`.** Pull requests created with the default token do not
+   start the PR build workflow. If you want them to, create a *fine-grained*
+   personal access token owned by a **separate bot account**, limited to **this
+   repository only**, with contents, pull requests and issues write access, and
+   store it as the repository secret `BOT_TOKEN`. Be aware of the consequence:
+   with `BOT_TOKEN` set, anyone who opens an "Add a package" issue makes CI
+   build the repository they named (the build runs with no secrets, but it does
+   run their code on GitHub's runners).
+8. **Tool version.** `.scdeken-version` holds the sc-deken tag or branch the
    workflows install with `go install`. It starts as `main`; after the first
    sc-deken release, pin it to that tag (for example `v0.1.0`).
 

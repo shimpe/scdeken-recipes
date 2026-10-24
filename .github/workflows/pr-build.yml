@@ -27,6 +27,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
+          cache: false
       - name: Install scdeken
         run: |
           go install "github.com/sc-deken/sc-deken/cmd/scdeken@$(cat .scdeken-version)"
@@ -76,6 +77,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
+          cache: false
       - name: Install scdeken
         run: |
           go install "github.com/sc-deken/sc-deken/cmd/scdeken@$(cat .scdeken-version)"
@@ -177,12 +179,19 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           for file in results/*.md; do
-            marker="$(head -n 1 "$file")"
-            id="$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
-              --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n 1)"
+            name="$(basename "$file" .md)"
+            if ! [[ "$name" =~ ^[A-Za-z0-9._+-]+$ ]]; then
+              echo "::warning::ignoring a result with an unexpected name"
+              continue
+            fi
+            # The marker comes from the file name; the file's text is only ever posted as a body.
+            marker="<!-- scdeken-build:$name -->"
+            { echo "$marker"; tail -n +2 "$file"; } > "body-$name.txt"
+            id="$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" |
+              jq -r --arg m "$marker" '.[] | select(.user.type == "Bot" and (.body | startswith($m))) | .id' | head -n 1)"
             if [ -n "$id" ]; then
-              gh api -X PATCH "repos/$REPO/issues/comments/$id" -F "body=@$file" > /dev/null
+              gh api -X PATCH "repos/$REPO/issues/comments/$id" -F "body=@body-$name.txt" > /dev/null
             else
-              gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file "$file"
+              gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file "body-$name.txt"
             fi
           done
