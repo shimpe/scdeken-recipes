@@ -2,6 +2,7 @@ name: PR build
 
 # Builds every newly approved recipe version on every platform and reports the
 # result. Runs on pull_request (never pull_request_target) and holds no secrets.
+# Branch protection requires only the fixed-name check pr-build-result.
 
 on:
   pull_request:
@@ -154,6 +155,30 @@ jobs:
       - name: Fail if the build failed
         if: steps.build.outcome != 'success'
         run: exit 1
+
+  # The one check to require in branch protection: its name never changes,
+  # unlike the build legs'. A failed recipe check or advisory validation fails
+  # it; a failed platform build is reported (red leg, comment) but does not,
+  # because publishing leaves that platform out and releases the others.
+  result:
+    name: pr-build-result
+    needs: [plan, build]
+    if: always()
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Recipes checked, builds reported
+        env:
+          PLAN: ${{ needs.plan.result }}
+          BUILD: ${{ needs.build.result }}
+        run: |
+          echo "recipe check and plan: $PLAN; platform builds: $BUILD"
+          if [ "$PLAN" != "success" ]; then
+            echo "::error::the recipe check or the advisory validation failed"
+            exit 1
+          fi
+          if [ "$BUILD" = "failure" ]; then
+            echo "::warning::some platforms failed to build; publishing would leave them out"
+          fi
 
   comment:
     name: comment on the pull request

@@ -42,6 +42,9 @@ refreshes the index.
 Advisories in `advisories/` retract malicious, vulnerable or broken versions.
 See [advisories/README.md](advisories/README.md). Changes there are reviewed by
 the code owner and published by the Index workflow as soon as they reach `main`.
+Keep the `advisories/` folder even when it holds no advisory (its README keeps it
+in git): the index build stops with an error when the folder is missing, so a
+wrong path can never publish a package list without its advisories.
 
 ## Setting up the repository (maintainers)
 
@@ -49,12 +52,15 @@ the code owner and published by the Index workflow as soon as they reach `main`.
 
        scdeken index keygen --out-dir <secure folder>
 
-   This writes `scdeken.pub` and the password-protected `scdeken.key`. Never
-   commit the key.
-2. **Secrets.** Create a GitHub *environment* named `release`, restrict it to the
-   `main` branch, and add two secrets to it: `SCDEKEN_SIGNING_KEY` (the text of
-   `scdeken.key`) and `SCDEKEN_SIGNING_PASSWORD`. Only the Index workflow's sign job and the
-   release step of Publish use this environment; pull request builds never see it.
+   This asks for the password twice and writes `scdeken.pub` and the
+   password-protected `scdeken.key`. Never commit the key.
+2. **Secrets.** First create a GitHub *environment* named `release` and restrict
+   it to the `main` branch (Settings > Environments > Deployment branches);
+   only **then** add its two secrets: `SCDEKEN_SIGNING_KEY` (the text of
+   `scdeken.key`) and `SCDEKEN_SIGNING_PASSWORD`. Secrets added before the
+   restriction are open to every branch for that moment. Only the Index
+   workflow's sign job and the release step of Publish use this environment;
+   pull request builds never see it.
 3. **Public key.** Paste the contents of `scdeken.pub` into `EmbeddedPublicKey`
    in `internal/sign/key.go` of the sc-deken repository and ship a new release.
 4. **Pages.** In Settings > Pages choose *GitHub Actions* as the source.
@@ -63,14 +69,23 @@ the code owner and published by the Index workflow as soon as they reach `main`.
 6. **Branch protection (required).** "Merging a pull request means the version is
    approved" is only true if `main` is protected. Create a ruleset for `main` that:
    - requires a pull request before merging;
-   - requires review from Code Owners (`.github/CODEOWNERS`);
-   - requires the **PR build** status checks (`check recipes and plan builds`
-     and the `build ...` jobs) to pass;
+   - requires review from Code Owners (`.github/CODEOWNERS`) — see the note below;
+   - requires the status check **`pr-build-result`** (the only check with a fixed
+     name: it fails when a recipe check or the advisory validation fails; a
+     platform that fails to build is reported but does not block, because
+     Publish leaves that platform out and releases the others);
    - has **no bypass** for GitHub Actions, the bot account or admins you do not
      want to trust blindly;
    - blocks force pushes and branch deletion.
    Without this, anyone who can push can approve a version, and the publish and
    index workflows will build and sign it.
+
+   *With a single maintainer*, "require review from Code Owners" blocks the
+   owner's own pull requests, because nobody else can approve them. Choose one,
+   knowingly: allow only the owner to bypass the review rule, or require
+   0 approvals until a second maintainer joins (the pull request and the
+   `pr-build-result` check are still required). Turn the review back on as soon
+   as there are two maintainers.
 7. **Optional `BOT_TOKEN`.** Pull requests created with the default token do not
    start the PR build workflow. If you want them to, create a *fine-grained*
    personal access token owned by a **separate bot account**, limited to **this
@@ -79,9 +94,19 @@ the code owner and published by the Index workflow as soon as they reach `main`.
    with `BOT_TOKEN` set, anyone who opens an "Add a package" issue makes CI
    build the repository they named (the build runs with no secrets, but it does
    run their code on GitHub's runners).
-8. **Tool version.** `.scdeken-version` holds the sc-deken tag or branch the
-   workflows install with `go install`. It starts as `main`; after the first
-   sc-deken release, pin it to that tag (for example `v0.1.0`).
+8. **Tool version.** `.scdeken-version` holds the sc-deken version the workflows
+   install with `go install`, including the job that signs the index. Keep it
+   pinned to a reviewed tag (for example `v0.1.0`) or a full 40-character commit
+   id of the sc-deken repository, never a branch, and change it only through a
+   reviewed pull request. (It says `main` only until sc-deken is first published.)
+
+## Rebuilding a version
+
+Publish builds each platform separately; a platform that fails is left out of
+the release and the others are published. To try a version again (for example
+after fixing a runner problem), run the **Publish** workflow by hand (Actions >
+Publish > Run workflow) with the recipe file (`recipes/<name>.toml`) and the
+approved version. It adds the platforms that now build to the existing release.
 
 ## License
 
