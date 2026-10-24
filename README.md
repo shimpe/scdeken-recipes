@@ -1,9 +1,9 @@
 # sc-deken recipes
 
-This repository is the package list behind [sc-deken](https://github.com/sc-deken/sc-deken),
+This repository is the package list behind [sc-deken](https://github.com/shimpe/scdeken),
 a package manager for SuperCollider plugins and quarks. Maintainers review recipes
 and advisories here; CI builds and signs the binaries and publishes the signed
-index at <https://sc-deken.github.io/sc-deken-recipes/index.json>.
+index at <https://shimpe.github.io/scdeken-recipes/index.json>.
 
 ## Add a package
 

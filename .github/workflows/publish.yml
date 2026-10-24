@@ -33,7 +33,7 @@ jobs:
           cache: false
       - name: Install scdeken
         run: |
-          go install "github.com/sc-deken/sc-deken/cmd/scdeken@$(cat .scdeken-version)"
+          go install "github.com/shimpe/scdeken/cmd/scdeken@$(cat .scdeken-version)"
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
       - name: Plan builds
         id: matrix
@@ -76,7 +76,7 @@ jobs:
           cache: false
       - name: Install scdeken
         run: |
-          go install "github.com/sc-deken/sc-deken/cmd/scdeken@$(cat .scdeken-version)"
+          go install "github.com/shimpe/scdeken/cmd/scdeken@$(cat .scdeken-version)"
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
       - name: Does the recipe need libraries?
         id: requires

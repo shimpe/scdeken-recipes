@@ -32,7 +32,7 @@ jobs:
           cache: false
       - name: Install scdeken
         run: |
-          go install "github.com/sc-deken/sc-deken/cmd/scdeken@$(cat .scdeken-version)"
+          go install "github.com/shimpe/scdeken/cmd/scdeken@$(cat .scdeken-version)"
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
       - name: Draft the recipe and open a pull request
         env:
