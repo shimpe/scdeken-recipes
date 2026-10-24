@@ -12,6 +12,9 @@ sc_path_var = "SC_PATH"
 cmake_flags = ["-DSUPERNOVA=ON"]
 submodules = true
 
+[requires]
+fftw = { apt = "libfftw3-dev", brew = "fftw", pacman = "fftw", dnf = "fftw-devel", vcpkg = "fftw3", pkgconfig = "fftw3f" }
+
 [versions]
 tag_prefix = "Version-"
 
