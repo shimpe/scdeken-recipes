@@ -5,6 +5,9 @@ license = "GPL-3.0"
 authors = ["shimpe"]
 kind = "quark"
 
+[depends]
+Panola = ">=0.8.0"
+
 [versions]
 tag_prefix = ""
 
