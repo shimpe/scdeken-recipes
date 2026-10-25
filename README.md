@@ -67,8 +67,14 @@ wrong path can never publish a package list without its advisories.
 3. **Public key.** Paste the contents of `scdeken.pub` into `EmbeddedPublicKey`
    in `internal/sign/key.go` of the sc-deken repository and ship a new release.
 4. **Pages.** In Settings > Pages choose *GitHub Actions* as the source.
-5. **Actions settings.** Allow GitHub Actions to create pull requests
-   (Settings > Actions > General). Then create the label **`add-package`**
+5. **Actions settings.** Allow GitHub Actions to create pull requests:
+   Settings > Actions > General, scroll to **Workflow permissions**, tick
+   **Allow GitHub Actions to create and approve pull requests**, and click
+   **Save**. Leave the permissions radio button on read-only; the workflows ask
+   for what they need per job. Do the same in the sc-deken tool repository,
+   whose release workflow opens a pull request too (details in the maintainer
+   guide: [Letting workflows open pull requests](https://github.com/shimpe/scdeken/blob/main/docs/maintainer-guide.md#letting-workflows-open-pull-requests)).
+   Then create the label **`add-package`**
    (Issues > Labels > New label). The "Add a package" form, which the
    **Suggest a package** button in the SuperCollider window opens, tags new
    issues with it, and the add-package workflow only runs for issues that carry
