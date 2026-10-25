@@ -68,7 +68,11 @@ wrong path can never publish a package list without its advisories.
    in `internal/sign/key.go` of the sc-deken repository and ship a new release.
 4. **Pages.** In Settings > Pages choose *GitHub Actions* as the source.
 5. **Actions settings.** Allow GitHub Actions to create pull requests
-   (Settings > Actions > General).
+   (Settings > Actions > General). Then create the label **`add-package`**
+   (Issues > Labels > New label). The "Add a package" form, which the
+   **Suggest a package** button in the SuperCollider window opens, tags new
+   issues with it, and the add-package workflow only runs for issues that carry
+   it. GitHub silently drops a form's label when the label does not exist.
 6. **Branch protection (required).** "Merging a pull request means the version is
    approved" is only true if `main` is protected. Create a ruleset for `main` that:
    - requires a pull request before merging;
