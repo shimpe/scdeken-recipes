@@ -121,6 +121,20 @@ after fixing a runner problem), run the **Publish** workflow by hand (Actions >
 Publish > Run workflow) with the recipe file (`recipes/<name>.toml`) and the
 approved version. It adds the platforms that now build to the existing release.
 
+## A new SuperCollider release
+
+`sc-versions.toml` says which SuperCollider release has which plugin API (the
+`api3` in download names such as `windows-x86_64-api3.zip`). The window uses it
+to pick downloads that load in the user's SuperCollider; a release newer than
+the table gets local builds instead. CI builds every API in the table once per
+platform, against the newest release listed for it.
+
+When SuperCollider releases a new version, check its `sc_api_version` (in
+`include/plugin_interface/SC_InterfaceTable.h`). Same API: raise `version` in
+that row. New API: add a row with `min` set to that release, then rebuild the
+versions that should get downloads for it as described above. Step by step:
+[maintainer guide, SuperCollider versions and the plugin API](https://github.com/shimpe/scdeken/blob/main/docs/maintainer-guide.md#supercollider-versions-and-the-plugin-api).
+
 ## License
 
 MIT, see [LICENSE](LICENSE).

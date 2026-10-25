@@ -51,17 +51,16 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           scdeken ci matrix --recipes recipes --base "$BASE_SHA" > rows.json
-          scdeken ci platforms > platforms.json
+          scdeken ci targets --sc-versions sc-versions.toml > targets.json
           # Quark-only recipes have no [build] table and nothing to compile.
           for recipe in $(jq -r '.[].recipe' rows.json | sort -u); do
             if grep -q '^\[build' "$recipe"; then echo "$recipe"; fi
           done | jq -R . | jq -s . > buildable.json
-          jq -c --slurpfile platforms platforms.json --slurpfile buildable buildable.json '
+          jq -c --slurpfile targets targets.json --slurpfile buildable buildable.json '
             {include: [ .[] | select(.recipe as $r | $buildable[0] | any(. == $r)) as $row
-              | $platforms[0][]
+              | $targets[0][]
               | {recipe: $row.recipe, package: $row.package, version: $row.version,
-                 runner, key_os, arch, build_arch,
-                 key: (.key_os + "-" + .arch + "-api3")} ]}' rows.json > matrix.json
+                 runner, key_os, arch, build_arch, sc_version, key} ]}' rows.json > matrix.json
           echo "matrix=$(cat matrix.json)" >> "$GITHUB_OUTPUT"
           echo "has_builds=$(jq '.include | length > 0' matrix.json)" >> "$GITHUB_OUTPUT"
 
@@ -110,12 +109,13 @@ jobs:
           VERSION: ${{ matrix.version }}
           KEY: ${{ matrix.key }}
           BUILD_ARCH: ${{ matrix.build_arch }}
+          SC_VERSION: ${{ matrix.sc_version }}
           NEEDS_VCPKG: ${{ steps.requires.outputs.needed }}
         run: |
           set -o pipefail
           out="$RUNNER_TEMP/out/$KEY"
           mkdir -p "$RUNNER_TEMP/out" "$RUNNER_TEMP/stage"
-          args=(--recipe "$RECIPE" --version "$VERSION" --out "$out")
+          args=(--recipe "$RECIPE" --version "$VERSION" --sc-version "$SC_VERSION" --out "$out")
           if [ -n "$BUILD_ARCH" ]; then args+=(--arch "$BUILD_ARCH"); fi
           if [ "$NEEDS_VCPKG" = "true" ]; then args+=(--vcpkg-root "$RUNNER_TEMP/vcpkg"); fi
           scdeken build "${args[@]}" 2>&1 | tee "$RUNNER_TEMP/build.log"
