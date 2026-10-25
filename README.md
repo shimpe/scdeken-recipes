@@ -11,6 +11,12 @@ The easy way: open an issue with the **Add a package** form and paste the GitHub
 address of the plugin or quark. A bot drafts the recipe and opens a pull request;
 the build results for every platform appear as comments on that pull request.
 
+Users can open that form from inside SuperCollider. In the `Deken.gui` window,
+**Suggest a package** (above the list) opens it in the browser; with a GitHub
+address typed in the search box, the address is filled in. An unreviewed
+package's details pane has **Suggest for review**, which opens the form with
+that package's repository already filled in.
+
 The manual way:
 
     scdeken recipe new https://github.com/owner/name --out recipes/name.toml
