@@ -62,7 +62,8 @@ wrong path can never publish a package list without its advisories.
    `scdeken.key`) and `SCDEKEN_SIGNING_PASSWORD`. Secrets added before the
    restriction are open to every branch for that moment. Only the Index
    workflow's sign job and the release step of Publish use this environment;
-   pull request builds never see it.
+   pull request builds never see it. Every click is listed in the maintainer
+   guide: [Storing the key in GitHub, step by step](https://github.com/shimpe/scdeken/blob/main/docs/maintainer-guide.md#storing-the-key-in-github-step-by-step).
 3. **Public key.** Paste the contents of `scdeken.pub` into `EmbeddedPublicKey`
    in `internal/sign/key.go` of the sc-deken repository and ship a new release.
 4. **Pages.** In Settings > Pages choose *GitHub Actions* as the source.
