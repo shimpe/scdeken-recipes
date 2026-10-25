@@ -105,6 +105,28 @@ wrong path can never publish a package list without its advisories.
    0 approvals until a second maintainer joins (the pull request and the
    `pr-build-result` check are still required). Turn the review back on as soon
    as there are two maintainers.
+
+   Step by step (**Settings → Rules → Rulesets → New ruleset → New branch
+   ruleset**):
+   1. **Ruleset name** `main`, **Enforcement status** *Active*.
+   2. **Bypass list**: leave it empty.
+   3. **Target branches** → *Add target* → **Include default branch**.
+   4. Tick **Restrict deletions** and **Block force pushes**.
+   5. Tick **Require a pull request before merging**. With one maintainer: set
+      **Required approvals** to 0 and leave **Require review from Code Owners**
+      off. With two or more: 1 approval and Code Owners on.
+   6. Tick **Require status checks to pass** → *Add checks* → type
+      `pr-build-result` and pick it (it is offered once a PR build has run;
+      choose GitHub Actions as the source if asked).
+   7. **Create**.
+
+   From then on every change reaches `main` through a pull request, a README
+   fix included: push a branch, open the pull request, wait for
+   `pr-build-result`, merge. The PR build runs on every pull request, so the
+   check also reports on pull requests that touch no recipe. When the check
+   never starts (a bot's pull request without `BOT_TOKEN`, see step 7, or a run
+   waiting for approval), approve the waiting run on the pull request's
+   **Checks** tab, or close and reopen the pull request.
 7. **Optional `BOT_TOKEN`.** Pull requests created with the default token do not
    start the PR build workflow. If you want them to, create a *fine-grained*
    personal access token owned by a **separate bot account**, limited to **this
