@@ -10,3 +10,4 @@ tag_prefix = ""
 
 [versions.approved]
 "1.1.0" = "d5e55dc581373b1b4bdd671bba56281fa73d6f95"
+"1.2.0" = "ec0c91d1b4c94a98b4f36bd7569c1a7d92d9a5c5"
