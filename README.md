@@ -53,7 +53,9 @@ wrong path can never publish a package list without its advisories.
        scdeken index keygen --out-dir <secure folder>
 
    This asks for the password twice and writes `scdeken.pub` and the
-   password-protected `scdeken.key`. Never commit the key.
+   password-protected `scdeken.key`. Never commit the key. On Windows, quote a
+   folder name with spaces and leave out the trailing backslash:
+   `--out-dir 'C:\Users\me\signing keys'` (see the maintainer guide).
 2. **Secrets.** First create a GitHub *environment* named `release` and restrict
    it to the `main` branch (Settings > Environments > Deployment branches);
    only **then** add its two secrets: `SCDEKEN_SIGNING_KEY` (the text of
