@@ -18,3 +18,4 @@ tag_prefix = ""
 [versions.approved]
 "0.1.0" = "baa8d625464eed7eef306b6fd3b0498344c6b8b9"
 # NOTE: no tags upstream; version name 0.1.0 chosen for commit baa8d62
+"01.1.2" = "03a66c9c8a85a8b8d9df059a799ba7df349a658b"
