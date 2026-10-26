@@ -77,7 +77,9 @@ wrong path can never publish a package list without its advisories.
    guide: [Storing the key in GitHub, step by step](https://github.com/shimpe/scdeken/blob/main/docs/maintainer-guide.md#storing-the-key-in-github-step-by-step).
 3. **Public key.** Paste the contents of `scdeken.pub` into `EmbeddedPublicKey`
    in `internal/sign/key.go` of the sc-deken repository and ship a new release.
-4. **Pages.** In Settings > Pages choose *GitHub Actions* as the source.
+4. **Pages.** In Settings > Pages choose *GitHub Actions* as the source. Not
+   *Deploy from a branch*: then every push publishes this README over the
+   index, and sc-deken users get "404 Not Found" for `index.json`.
 5. **Actions settings.** Allow GitHub Actions to create pull requests:
    Settings > Actions > General, scroll to **Workflow permissions**, tick
    **Allow GitHub Actions to create and approve pull requests**, and click
