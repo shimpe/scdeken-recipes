@@ -52,12 +52,31 @@ jobs:
             gh issue comment "$ISSUE_NUMBER" --body-file comment.md
             exit 1
           }
+          # The package already has a recipe: say which one and close the issue.
+          already() {
+            gh issue close "$ISSUE_NUMBER" --reason "not planned" --comment \
+              "Thanks! This package is already in sc-deken: [recipes/$1.toml]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/main/recipes/$1.toml). There is nothing to add."
+            exit 0
+          }
+          # One spelling of a repository address: lowercase, no scheme, no .git, no trailing slash.
+          repo_key() {
+            printf '%s\n' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's#^[a-z]+://##; s#/+$##; s#\.git$##; s#/+$##'
+          }
 
           url="$(printf '%s\n' "$ISSUE_BODY" | tr -d '\r' |
             awk '/^### GitHub URL of the plugin or quark/ {f=1; next} /^### / {f=0} f && NF {print; exit}')"
           if ! [[ "$url" =~ ^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/?$ ]]; then
             fail "The address must look like https://github.com/owner/name. Please edit the issue and try again."
           fi
+
+          # The same repository can have a recipe under another name.
+          want="$(repo_key "$url")"
+          for f in recipes/*.toml; do
+            repo="$(sed -n 's/^repo = "\(.*\)"$/\1/p' "$f" | head -n 1)"
+            if [ -n "$repo" ] && [ "$(repo_key "$repo")" = "$want" ]; then
+              already "$(basename "$f" .toml)"
+            fi
+          done
 
           draft="$RUNNER_TEMP/draft.toml"
           if ! message="$(scdeken recipe new "$url" --out "$draft" 2>&1)"; then
@@ -67,12 +86,15 @@ jobs:
           if ! [[ "$name" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
             fail "The draft recipe has an unusable name."
           fi
-          if [ -e "recipes/$name.toml" ]; then
-            fail "A recipe called $name already exists."
+          # Names are compared ignoring case: fmx6 and FMX6 would clash. The
+          # repository check above passed, so this is another repository.
+          existing="$(ls recipes | grep -ixF "$name.toml" | head -n 1 || true)"
+          if [ -n "$existing" ]; then
+            fail "A recipe called ${existing%.toml} already exists, for another repository. A maintainer has to choose a different name for this one."
           fi
 
           branch="add/$name"
-          if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
+          if git ls-remote --heads origin | cut -f2 | grep -iqxF "refs/heads/$branch"; then
             fail "A pull request branch for $name already exists."
           fi
           git config user.name "github-actions[bot]"

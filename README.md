@@ -10,10 +10,15 @@ index at <https://shimpe.github.io/scdeken-recipes/index.json>.
 The easy way: open an issue with the **Add a package** form and paste the GitHub
 address of the plugin or quark. A bot drafts the recipe and opens a pull request;
 the build results for every platform appear as comments on that pull request.
+If the repository already has a recipe (under any name, however the address is
+spelled), the bot says which one and closes the issue instead. If the draft would
+get the name of a recipe for another repository (ignoring case), the bot leaves the
+issue open for a maintainer to pick another name.
 
 Users can open that form from inside SuperCollider. In the `Deken.gui` window,
 **Suggest a package** (above the list) opens it in the browser; with a GitHub
-address typed in the search box, the address is filled in. An unreviewed
+address typed in the search box, the address is filled in, unless that address is
+already in the package list: then the window shows that package instead. An unreviewed
 package's details pane has **Suggest for review**, which opens the form with
 that package's repository already filled in.
 
